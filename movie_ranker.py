@@ -77,10 +77,10 @@ else:
 unrated_movies = df.query('imdbrating == "N/A"')
 
 rated_movies = df.query('imdbrating != "N/A"')
-rated_movies['imdbrating'] = rated_movies['imdbrating'].astype('float')
+rated_movies.loc[:, 'imdbrating'] = pd.to_numeric(rated_movies['imdbrating'], downcast='float')
 
 filtered_by_rating = rated_movies.query('imdbrating < 6.0')
 sorted_data = filtered_by_rating.sort_values(by=['imdbrating','boxoffice'], ascending=False)
 
 print(tabulate(unrated_movies, headers='keys', tablefmt='psql'))
-print(tabulate(sorted_data, headers='keys', tablefmt='psql'))
+#print(tabulate(sorted_data, headers='keys', tablefmt='psql'))
