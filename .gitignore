@@ -300,5 +300,6 @@ tags
 .ionide
 
 data/*.parquet.gzip
+.python-version
 
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,vim,emacs,linux,sublimetext
