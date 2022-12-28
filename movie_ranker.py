@@ -1,26 +1,27 @@
 import re
 import os
 
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
+import pandas as pd
+import numpy as np
 
 from tabulate import tabulate
 
 from decouple import config
 from omdb_handler import GetMovie
-import pandas as pd
-import numpy as np
+
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 filename = config('local_filepath')
 current_path = os.getcwd()
-parquetfile_location = '%s/data/movies.parquet.gzip' % current_path
+parquet_location = '%s/data/movies.parquet.gzip' % current_path
 
 movie_api = GetMovie(api_key=config('omdbapi_key'))
 
 base_rating = "5.5"
 
-class Movie:
 
+class Movie:
     movie_regex = r'(\d+)\s+(.*)\s+\((\d+)\)\s?(?:\[(.*p)\])?'
 
     def __init__(self, name, year, size, resolution=None, rating=None):
@@ -29,9 +30,10 @@ class Movie:
         self.resolution = resolution
         self.rating = rating
         self.size_in_bytes = size
-    
+
     def __str__(self) -> str:
         return 'Movie(%s,%s,%s,%s)' % (self.name, self.year, self.resolution, self.rating)
+
 
 def to_movie(line):
     p1 = re.compile(Movie.movie_regex)
@@ -41,30 +43,31 @@ def to_movie(line):
     else:
         print(f"Error: Could not parse: {line}")
 
+
 def get_movie_rating(m: Movie):
-    #print('Searching for %s' % m)
-    res = movie_api.get_movie(title=m.name, year=m.year)
+    movie_api.get_movie(title=m.name, year=m.year)
     rating = movie_api.get_data('imdbrating')
     m.rating = rating.get('imdbrating', 0.0)
     return m
 
 
 def search_movie(m: Movie):
-    #print('Searching for %s' % m)
     res = movie_api.get_movie(title=m.name, year=m.year)
     if res == 'Movie not found!':
         return None
     else:
-        movie = movie_api.get_data('title','year','rated', 'released', 'runtime', 'genre', 'metascore', 'imdbrating', 'boxoffice')
+        movie = movie_api.get_data('title', 'year', 'rated', 'released', 'runtime', 'genre', 'metascore', 'imdbrating',
+                                   'boxoffice')
         movie["size_in_bytes"] = m.size_in_bytes
         movie["resolution"] = m.resolution
         return movie
+
 
 def get_movies_from_api():
     with open(filename) as f:
         lines = [line.rstrip('\n') for line in f]
 
-    movie_data = []
+    movies = []
 
     for i in lines:
         movie = to_movie(i)
@@ -73,19 +76,20 @@ def get_movies_from_api():
             movies.append(data)
         else:
             print('Error: %s not found!' % movie)
-    return movie_data
+    return movies
 
-file_exists = os.path.exists(parquetfile_location) and os.path.isfile(parquetfile_location)
+
+file_exists = os.path.exists(parquet_location) and os.path.isfile(parquet_location)
 
 if file_exists:
     # Load parquet file into df, print df
-    df = pd.read_parquet(parquetfile_location)
-    print('Parquet file loaded from %s' % parquetfile_location)
+    df = pd.read_parquet(parquet_location)
+    print('Parquet file loaded from %s' % parquet_location)
 else:
     # Search for the movies, save parquet file, print df
     movie_data = get_movies_from_api()
     df = pd.DataFrame(movie_data)
-    df.to_parquet(parquetfile_location, compression='gzip')
+    df.to_parquet(parquet_location, compression='gzip')
 
 unrated_movies = df.query('imdbrating == "N/A"')
 
@@ -94,7 +98,7 @@ ratings = rated_movies['imdbrating'].astype(float)
 rated_movies.loc[:, 'imdbrating'] = ratings
 
 filtered_by_rating = rated_movies.query(f'imdbrating < {base_rating}')
-sorted_data = filtered_by_rating.sort_values(by=['imdbrating','boxoffice'], ascending=False)
+sorted_data = filtered_by_rating.sort_values(by=['imdbrating', 'boxoffice'], ascending=False)
 
 sorted_data["size_in_bytes"] = pd.to_numeric(sorted_data["size_in_bytes"])
 sorted_data["size_in_mb"] = (sorted_data["size_in_bytes"] / 1000000).apply(np.ceil)
