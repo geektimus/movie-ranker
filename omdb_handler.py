@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import requests
 
+
 @dataclass
 class GetMovie:
     """
@@ -34,8 +35,6 @@ class GetMovie:
     def get_data(self, *args):
         """
         Get values passing keys as parameter.
-
-        :param *args: items data key
 
         :Example:
         movie.get_data('Director', 'Actors')
