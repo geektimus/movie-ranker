@@ -304,5 +304,6 @@ data/*.parquet.gzip
 
 # Custom
 .vscode
+.idea
 
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,vim,emacs,linux,sublimetext
