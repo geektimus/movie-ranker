@@ -6,17 +6,16 @@ import numpy as np
 
 from tabulate import tabulate
 
-from decouple import config
 from omdb_handler import GetMovie
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-filename = config('local_filepath')
+filename = os.getenv('local_filepath', 'movies.txt')
 current_path = os.getcwd()
 parquet_location = '%s/data/movies.parquet.gzip' % current_path
 
-movie_api = GetMovie(api_key=config('omdbapi_key'))
+movie_api = GetMovie(api_key=os.getenv('omdbapi_key', ''))
 
 base_rating = "5.5"
 
@@ -24,7 +23,7 @@ base_rating = "5.5"
 class Movie:
     movie_regex = r'(\d+)\s+(.*)\s+\((\d+)\)\s?(?:\[(.*p)\])?'
 
-    def __init__(self, name, year, size, resolution=None, rating=None):
+    def __init__(self, name: str, year: str, size: str, resolution: str = "", rating: float = 0.0):
         self.name = name
         self.year = year
         self.resolution = resolution
@@ -33,6 +32,10 @@ class Movie:
 
     def __str__(self) -> str:
         return 'Movie(%s,%s,%s,%s)' % (self.name, self.year, self.resolution, self.rating)
+    
+    @staticmethod
+    def empty():
+        return Movie("", "", "")
 
 
 def to_movie(line):
@@ -42,13 +45,7 @@ def to_movie(line):
         return Movie(r.group(2), r.group(3), r.group(1), r.group(4))
     else:
         print(f"Error: Could not parse: {line}")
-
-
-def get_movie_rating(m: Movie):
-    movie_api.get_movie(title=m.name, year=m.year)
-    rating = movie_api.get_data('imdbrating')
-    m.rating = rating.get('imdbrating', 0.0)
-    return m
+        return Movie.empty()
 
 
 def search_movie(m: Movie):
