@@ -14,7 +14,7 @@ class GetMovie:
     movie = GetMovie(api_key='your api key')
     """
     api_key: str
-    values: dict = None
+    values: dict[str, str] = {}
 
     def get_movie(self, title, year):
         """

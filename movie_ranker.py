@@ -1,17 +1,20 @@
 import re
 import os
+import sys
 
 import pandas as pd
 import numpy as np
 
 from tabulate import tabulate
+from dotenv import load_dotenv
 
 from omdb_handler import GetMovie
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-filename = os.getenv('local_filepath', 'movies.txt')
+load_dotenv()
+
 current_path = os.getcwd()
 parquet_location = '%s/data/movies.parquet.gzip' % current_path
 
@@ -32,7 +35,7 @@ class Movie:
 
     def __str__(self) -> str:
         return 'Movie(%s,%s,%s,%s)' % (self.name, self.year, self.resolution, self.rating)
-    
+
     @staticmethod
     def empty():
         return Movie("", "", "")
@@ -76,7 +79,16 @@ def get_movies_from_api():
     return movies
 
 
-file_exists = os.path.exists(parquet_location) and os.path.isfile(parquet_location)
+filename = sys.argv[1]
+
+movies_file_exists = os.path.exists(filename) and os.path.isfile(filename)
+
+if not movies_file_exists:
+    print("No Valid Input File Provided: %s" % filename)
+    exit(1)
+
+file_exists = os.path.exists(
+    parquet_location) and os.path.isfile(parquet_location)
 
 if file_exists:
     # Load parquet file into df, print df
@@ -95,15 +107,18 @@ ratings = rated_movies['imdbrating'].astype(float)
 rated_movies.loc[:, 'imdbrating'] = ratings
 
 filtered_by_rating = rated_movies.query(f'imdbrating < {base_rating}')
-sorted_data = filtered_by_rating.sort_values(by=['imdbrating', 'boxoffice'], ascending=False)
+sorted_data = filtered_by_rating.sort_values(
+    by=['imdbrating', 'boxoffice'], ascending=False)
 
 sorted_data["size_in_bytes"] = pd.to_numeric(sorted_data["size_in_bytes"])
-sorted_data["size_in_mb"] = (sorted_data["size_in_bytes"] / 1000000).apply(np.ceil)
-sorted_data["size_in_gb"] = (sorted_data["size_in_bytes"] / 1000000000).round(2)
+sorted_data["size_in_mb"] = (
+    sorted_data["size_in_bytes"] / 1000000).apply(np.ceil)
+sorted_data["size_in_gb"] = (
+    sorted_data["size_in_bytes"] / 1000000000).round(2)
 sorted_data.drop("size_in_bytes", axis=1, inplace=True)
 
 print(f"Movies with Rating less than {base_rating}")
-print(tabulate(sorted_data, headers='keys', tablefmt='psql'))
+print(tabulate(sorted_data, headers='keys', tablefmt='psql'))  # type: ignore
 
 print("Unrated Movies")
-print(tabulate(unrated_movies, headers='keys', tablefmt='psql'))
+print(tabulate(unrated_movies, headers='keys', tablefmt='psql'))  # type: ignore
