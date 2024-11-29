@@ -1,3 +1,6 @@
+"""
+This script retrieves movies from the ombdapi database and returns a json object.
+"""
 from dataclasses import dataclass
 
 import requests
@@ -14,7 +17,7 @@ class GetMovie:
     movie = GetMovie(api_key='your api key')
     """
     api_key: str
-    values: dict[str, str] = {}
+    values: dict[str, str] = None
 
     def get_movie(self, title, year):
         """
@@ -27,7 +30,7 @@ class GetMovie:
         url = 'http://www.omdbapi.com/'
         payload = {'t': title, 'y': year,
                    'r': 'json', 'apikey': self.api_key}
-        result = requests.get(url, params=payload).json()
+        result = requests.get(url, params=payload, timeout=10).json()
         self.values = {k.lower(): v for k, v in result.items(
         )} if result['Response'] == 'True' else result['Error']
         return self.values
