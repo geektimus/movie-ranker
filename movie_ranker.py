@@ -1,5 +1,5 @@
 """
-This script is used to rank movies based on their IMDB ratings and the number 
+This script is used to rank movies based on their IMDB ratings and the number
 of votes they have received.
 It also allows users to search for movies and view their details.
 """
@@ -7,9 +7,11 @@ It also allows users to search for movies and view their details.
 import os
 import re
 import sys
+import argparse
 import warnings
+import logging
+from typing import Optional, Dict, List
 
-import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from tabulate import tabulate
@@ -24,86 +26,85 @@ current_path = os.getcwd()
 parquet_location = f'{current_path}/data/movies.parquet.gzip'
 
 movie_api = GetMovie(api_key=os.getenv('omdbapi_key', ''))
+
 BASE_MOVIE_RATING = "4.5"
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 class Movie:
     """
     Represents a movie and its metadata.
+
+    This class stores information about movies including name, year, resolution,
+    rating, and size in bytes.
     """
     movie_regex = r'(\d+)\s+(.*)\s+\((\d+)\)\s?(?:\[(.*p)\])?'
 
-    def __init__(self, name: str, year: str, size: str, resolution: str = "", rating: float = 0.0):
-        self.name = name
-        self.year = year
-        self.resolution = resolution
-        self.rating = rating
-        self.size_in_bytes = size
+    def __init__(self, **kwargs):
+        self.name = kwargs.get('name', "")
+        self.year = kwargs.get('year', "")
+        self.resolution = kwargs.get('resolution', "")
+        self.rating = kwargs.get('rating', 0.0)
+        self.size_in_bytes = kwargs.get('size', "")
 
     def __str__(self) -> str:
-        return f'Movie(name={self.name}, year={self.year}, resolution={self.resolution}, rating={self.rating})'
+        return f'Movie(name={self.name}, year={self.year}, ' \
+            f'resolution={self.resolution}, rating={self.rating})'
 
     @staticmethod
     def empty() -> 'Movie':
-        """Returns an instance of Movie with default values (i.e., all attributes are empty strings or 0.0)"""
-        return Movie("", "", "")
+        """Returns an instance of Movie with default values"""
+        return Movie()
 
 
-def to_movie(line):
-    """	Parses a line of text into a Movie object.
-
-    Args:
-        line (str): The line to parse.
-
-    Returns:
-        Movie: A movie object representing the given line.
-    """
-
+def to_movie(line: str) -> Optional[Movie]:
+    """Parses a line of text into a Movie object."""
     p1 = re.compile(Movie.movie_regex)
     r = p1.match(line)
     if r:
-        return Movie(r.group(2), r.group(3), r.group(1), r.group(4))
+        # Create a dictionary with the parsed values
+        movie_data = {
+            'name': r.group(2),
+            'year': r.group(3),
+            'size': r.group(1),
+            'resolution': r.group(4) or ""
+        }
+        return Movie(**movie_data)
 
-    print(f"Error: Could not parse: {line}")
+    logging.error("Error: Could not parse: %s", line)
     return None
 
 
-def search_movie(m: Movie):
-    """
-    Searches for a movie with the given attributes.
-
-    Args:
-        m (Movie): The movie object to search for.
-
-    Returns:
-        bool: Whether the movie was found.
-    """
-
+def search_movie(m: Movie) -> Optional[Dict]:
+    """Searches for a movie with the given attributes."""
     res = movie_api.get_movie(title=m.name, year=m.year)
     if res == 'Movie not found!':
         return None
 
-    movie = movie_api.get_data('title', 'year', 'rated', 'released', 'runtime', 'genre', 'metascore', 'imdbrating',
-                               'boxoffice')
+    movie = movie_api.get_data(
+        'title',
+        'year',
+        'rated',
+        'released',
+        'runtime',
+        'genre',
+        'metascore',
+        'imdbrating',
+        'boxoffice'
+    )
     movie["size_in_bytes"] = m.size_in_bytes
-    movie["resolution"] = m.resolution
+    movie["resolution"] = m.resolution if m.resolution else ""
     return movie
 
 
-def get_movies_from_api(file: str) -> list:
-    """Load a list of movies from an API and save them to the provided file.
-
-    Args:
-        file (str): The file to load/save the movies from/to.
-
-    Returns:
-        list: A list of Movie objects.
-    """
+def get_movies_from_api(file: str) -> List[Dict]:
+    """Load a list of movies from an API and save them to the provided file."""
     with open(file, encoding='utf-8') as f:
         lines = [line.rstrip('\n') for line in f]
 
     movies = []
-
     for i in lines:
         movie = to_movie(i)
         if movie is None:
@@ -117,50 +118,104 @@ def get_movies_from_api(file: str) -> list:
     return movies
 
 
-if len(sys.argv) != 2 or not os.path.isfile(sys.argv[1]):
-    print(
-        f"No argument provided. Please run the script with an argument. {len(sys.argv)}")
-    sys.exit(1)
+def update_movies(
+    parquet_df: pd.DataFrame,
+    movies: List[Dict]
+) -> pd.DataFrame:
+    """Update the dataframe with the given list of movies."""
+    for movie in movies:
+        if movie['title'] in parquet_df['title'].values:
+            parquet_df = parquet_df[parquet_df['title'] != movie['title']]
+        parquet_df = pd.concat(
+            [parquet_df, pd.DataFrame([movie])],
+            ignore_index=True
+        )
+    return parquet_df
 
-filename = sys.argv[1]
 
-movies_file_exists = os.path.exists(filename) and os.path.isfile(filename)
+def print_movies(df: pd.DataFrame):
+    """Print the movies in the dataframe."""
+    print(tabulate(
+        df.values.tolist(),
+        headers=df.columns.tolist(),
+        tablefmt='psql'
+    ))
 
-if not movies_file_exists:
-    print(f"No Valid Input File Provided: {filename}")
 
-file_exists = os.path.exists(
-    parquet_location) and os.path.isfile(parquet_location)
+def main():
+    """Main function for the script."""
+    parser = argparse.ArgumentParser(
+        description=(
+            'Rank movies based on their IMDB ratings and the number of '
+            'votes they have received.'
+        )
+    )
+    parser.add_argument(
+        '--file',
+        help='The file to load the movies from'
+    )
+    parser.add_argument(
+        '--output', 
+        help='The file to save the movies to'
+    )
+    parser.add_argument(
+        '--parquet',
+        help='The parquet file location to use for updates',
+        default='data/movies.parquet.gzip'
+    )
+    parser.add_argument(
+        '--update',
+        action='store_true',
+        help=(
+            'Update the movies from the file passed with --file. If used, '
+            'the existing parquet file will be updated and overwritten.'
+        )
+    )
 
-if file_exists:
-    # Load parquet file into df, print df
-    df = pd.read_parquet(parquet_location)
-    print(f'Parquet file loaded from {parquet_location}')
-else:
-    # Search for the movies, save parquet file, print df
-    movie_data = get_movies_from_api(filename)
-    df = pd.DataFrame(movie_data)
-    df.to_parquet(parquet_location, compression='gzip')
+    args = parser.parse_args()
 
-unrated_movies = df.query('imdbrating == "N/A"')
+    if not args.file:
+        print('Error: No input file provided.')
+        sys.exit(1)
 
-rated_movies = df.query('imdbrating != "N/A"').copy()
-ratings = rated_movies['imdbrating'].astype(float)
-rated_movies.loc[:, 'imdbrating'] = ratings
+    if not args.output:
+        print('Error: No output file provided.')
+        sys.exit(1)
 
-filtered_by_rating = rated_movies.query(f'imdbrating < {BASE_MOVIE_RATING}')
-sorted_data = filtered_by_rating.sort_values(
-    by=['imdbrating', 'boxoffice'], ascending=False)
+    if args.update:
+        if not args.parquet:
+            print('Error: No parquet file provided.')
+            sys.exit(1)
 
-sorted_data["size_in_bytes"] = pd.to_numeric(sorted_data["size_in_bytes"])
-sorted_data["size_in_mb"] = (
-    sorted_data["size_in_bytes"] / 1000000).apply(np.ceil)
-sorted_data["size_in_gb"] = (
-    sorted_data["size_in_bytes"] / 1000000000).round(2)
-sorted_data.drop("size_in_bytes", axis=1, inplace=True)
+        if not os.path.exists(args.parquet):
+            print('Error: No parquet file found.')
+            sys.exit(1)
 
-print(f"Movies with Rating less than {BASE_MOVIE_RATING}")
-print(tabulate(sorted_data, headers='keys', tablefmt='psql'))  # type: ignore
+        parquet_df = pd.read_parquet(args.parquet)
+        with open(args.file, encoding='utf-8') as f:
+            lines = [line.rstrip('\n') for line in f]
 
-print("Unrated Movies")
-print(tabulate(unrated_movies, headers='keys', tablefmt='psql'))  # type: ignore
+        movies = []
+        for i in lines:
+            movie = to_movie(i)
+            if not movie:
+                continue
+
+            data = search_movie(movie)
+            if data is not None:
+                movies.append(data)
+            else:
+                print(f'Warning: {movie} not found!')
+
+        updated_df = update_movies(parquet_df, movies)
+        updated_df.to_parquet(args.output, compression='gzip')
+        print_movies(updated_df)
+    else:
+        movie_data = get_movies_from_api(args.file)
+        df = pd.DataFrame(movie_data)
+        df.to_parquet(args.output, compression='gzip')
+        print_movies(df)
+
+
+if __name__ == '__main__':
+    main()

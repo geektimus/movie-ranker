@@ -2,6 +2,7 @@
 This script retrieves movies from the ombdapi database and returns a json object.
 """
 from dataclasses import dataclass
+from typing import Optional
 
 import requests
 
@@ -12,12 +13,14 @@ class GetMovie:
     instantiate the class, passing api key.
 
     :param api_key: ombdapi key
+    :param parquet_file: path to the parquet file (optional)
 
     :Example:
-    movie = GetMovie(api_key='your api key')
+    movie = GetMovie(api_key='your api key', parquet_file='path/to/file.parquet')
     """
     api_key: str
-    values: dict[str, str] = None
+    parquet_file: Optional[str] = None
+    values: Optional[dict[str, str]] = None
 
     def get_movie(self, title, year):
         """
@@ -42,6 +45,9 @@ class GetMovie:
         :Example:
         movie.get_data('Director', 'Actors')
         """
+        if not isinstance(self.values, dict):
+            return {}
+            
         items = {item.lower(): self.values.get(
             item.lower(), 'key not found!') for item in args}
 
