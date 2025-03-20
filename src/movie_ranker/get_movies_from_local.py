@@ -5,6 +5,7 @@ the movies_local.txt file in the data folder
 
 import os
 import argparse
+from pathlib import Path
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Get movies from local folder and save to file')
@@ -12,7 +13,7 @@ def parse_args():
                         required=True,
                         help='Input folder containing movie files')
     parser.add_argument('--output', '-o',
-                        default=os.path.join("data", "movies.local.txt"),
+                        default=str(Path(__file__).parent / "data" / "movies.local.txt"),
                         help='Output file path (default: data/movies.local.txt)')
     return parser.parse_args()
 

@@ -11,19 +11,22 @@ import argparse
 import warnings
 import logging
 from typing import Optional, Dict, List
+from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
 from tabulate import tabulate
 
-from omdb_handler import GetMovie
+from movie_ranker.omdb_handler import GetMovie
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 load_dotenv()
 
-current_path = os.getcwd()
-parquet_location = f'{current_path}/data/movies.parquet.gzip'
+# Get the package data directory
+package_dir = Path(__file__).parent
+data_dir = package_dir / "data"
+parquet_location = data_dir / "movies.parquet.gzip"
 
 movie_api = GetMovie(api_key=os.getenv('omdbapi_key', ''))
 
@@ -161,7 +164,7 @@ def main():
     parser.add_argument(
         '--parquet',
         help='The parquet file location to use for updates',
-        default='data/movies.parquet.gzip'
+        default=str(data_dir / "movies.parquet.gzip")
     )
     parser.add_argument(
         '--update',
