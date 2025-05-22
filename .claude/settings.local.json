@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(uv run ruff:*)",
+      "Bash(uv run black:*)",
+      "Bash(uv run:*)",
+      "Bash(uv sync:*)"
+    ],
+    "deny": []
+  }
+}
