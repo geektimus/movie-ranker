@@ -6,9 +6,14 @@ the movies_local.txt file in the data folder
 import os
 import argparse
 
+
 def parse_args():
-    parser = argparse.ArgumentParser(description='Get movies from local folder and save to file')
-    parser.add_argument('--input', '-i', 
+    """
+    Parse command line arguments
+    """
+    parser = argparse.ArgumentParser(
+        description='Get movies from local folder and save to file')
+    parser.add_argument('--input', '-i',
                         required=True,
                         help='Input folder containing movie files')
     parser.add_argument('--output', '-o',
@@ -16,12 +21,16 @@ def parse_args():
                         help='Output file path (default: data/movies.local.txt)')
     return parser.parse_args()
 
+
 def main():
+    """
+    Main function
+    """
     args = parse_args()
-    
+
     # Create output directory if it doesn't exist
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
-    
+
     for filename in os.listdir(args.input):
         if not filename.endswith(".mp4"):
             continue
@@ -33,6 +42,7 @@ def main():
         # Write to specified output file
         with open(args.output, "a", encoding='utf-8') as f:
             f.write(f"{file_size} {file_name_without_extension}\n")
+
 
 if __name__ == "__main__":
     main()

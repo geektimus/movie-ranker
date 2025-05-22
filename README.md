@@ -29,6 +29,7 @@ python get_movies_from_local.py -i /path/to/movies -o /path/to/output.txt
 ### Output Format
 
 The script generates a text file with each line containing:
+
 - File size (in bytes)
 - Movie name (without extension)
 
